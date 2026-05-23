@@ -8,3 +8,4 @@ sentinel-keypair.json
 .env
 .DS_Store
 .claude/
+.idea
