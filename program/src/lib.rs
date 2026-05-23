@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("PROGRAM_ID_PLACEHOLDER");
+declare_id!("J7gxnojav3SRfJxHhFGsW2iATBV4zVUsrkcKNzauPqRa");
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -16,6 +16,21 @@ const SENTINEL_AUTHORITY: &str = "SENTINEL_AUTHORITY_PLACEHOLDER";
 #[program]
 pub mod quantum_airbag {
     use super::*;
+
+    /// Initialize the global algorithm registry PDA.
+    /// Must be called once before any withdrawals can occur.
+    pub fn initialize_registry(ctx: Context<InitializeRegistry>) -> Result<()> {
+        let registry = &mut ctx.accounts.algo_registry;
+        registry.authority = ctx.accounts.authority.key();
+        registry.active_mask = u64::MAX; // All algorithms active initially
+        registry.bump = ctx.bumps.algo_registry;
+        msg!(
+            "Algorithm registry initialized by {} at slot {}",
+            ctx.accounts.authority.key(),
+            Clock::get()?.slot
+        );
+        Ok(())
+    }
 
     /// Move SOL from an Ed25519 wallet into the PDA vault.
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
@@ -164,6 +179,21 @@ fn verify_ml_dsa_65(_pubkey: &[u8; PQC_PUBKEY_LEN], _sig_hash: &[u8; 32]) -> Res
 // ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct InitializeRegistry<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + AlgoRegistry::INIT_SPACE,
+        seeds = [b"algo_registry"],
+        bump
+    )]
+    pub algo_registry: Account<'info, AlgoRegistry>,
+    #[account(mut)]
+    pub authority: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {

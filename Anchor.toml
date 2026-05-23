@@ -5,7 +5,7 @@ seeds = false
 skip-lint = false
 
 [programs.devnet]
-quantum_airbag = "PROGRAM_ID_PLACEHOLDER"
+quantum_airbag = "J7gxnojav3SRfJxHhFGsW2iATBV4zVUsrkcKNzauPqRa"
 
 [registry]
 url = "https://api.apr.dev"
