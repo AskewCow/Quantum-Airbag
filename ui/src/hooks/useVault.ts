@@ -20,7 +20,7 @@ export function useVault(
 
     const updateVault = async () => {
       try {
-        const vaultAccount = await program.account.vaultAccount.fetch(vaultPDA);
+        const vaultAccount = await (program.account as any).vaultAccount.fetch(vaultPDA);
         setVaultBalance(vaultAccount.balance.toNumber());
         setVaultMode(
           vaultAccount.mode.normal !== undefined ? 'Normal' : 'Lockdown'

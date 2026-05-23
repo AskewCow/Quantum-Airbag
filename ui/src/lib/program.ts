@@ -1,6 +1,5 @@
 import { Program, AnchorProvider, Idl } from '@coral-xyz/anchor';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { PROGRAM_ID } from './constants';
 
 export function getVaultPDA(owner: PublicKey, programId: PublicKey): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
@@ -21,5 +20,5 @@ export function createProgram(connection: Connection, wallet: any, idl: Idl): Pr
     commitment: 'confirmed',
   });
 
-  return new Program(idl, PROGRAM_ID, provider);
+  return new Program(idl, provider);
 }

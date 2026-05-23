@@ -35,32 +35,36 @@ pub mod quantum_airbag {
         Ok(())
     }
 
+    /// Create and initialise the vault PDA for the caller. Must be called once
+    /// before the first deposit.
+    pub fn init_vault(ctx: Context<InitVault>) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        vault.owner = ctx.accounts.owner.key();
+        vault.bump = ctx.bumps.vault;
+        vault.algo_version = AlgoVersion::MlDsa65;
+        vault.mode = VaultMode::Normal;
+        vault.balance = 0;
+        Ok(())
+    }
+
     /// Move SOL from an Ed25519 wallet into the PDA vault.
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         require!(amount > 0, VaultError::InsufficientBalance);
 
-        let vault = &mut ctx.accounts.vault;
-        if vault.owner == Pubkey::default() {
-            vault.owner = ctx.accounts.owner.key();
-            vault.bump = ctx.bumps.vault;
-            vault.algo_version = AlgoVersion::MlDsa65;
-            vault.mode = VaultMode::Normal;
-        }
-
         let ix = anchor_lang::solana_program::system_instruction::transfer(
             &ctx.accounts.owner.key(),
-            &vault.key(),
+            &ctx.accounts.vault.key(),
             amount,
         );
         anchor_lang::solana_program::program::invoke(
             &ix,
             &[
                 ctx.accounts.owner.to_account_info(),
-                vault.to_account_info(),
+                ctx.accounts.vault.to_account_info(),
             ],
         )?;
 
-        vault.balance = vault.balance.checked_add(amount).unwrap();
+        ctx.accounts.vault.balance = ctx.accounts.vault.balance.checked_add(amount).unwrap();
         Ok(())
     }
 
@@ -210,15 +214,29 @@ pub struct InitializeRegistry<'info> {
 }
 
 #[derive(Accounts)]
-pub struct Deposit<'info> {
+pub struct InitVault<'info> {
     #[account(
-        init_if_needed,
+        init,
         payer = owner,
         space = 8 + VaultAccount::INIT_SPACE,
         seeds = [b"vault", owner.key().as_ref()],
         bump
     )]
-    pub vault: Account<'info, VaultAccount>,
+    pub vault: Box<Account<'info, VaultAccount>>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Deposit<'info> {
+    #[account(
+        mut,
+        seeds = [b"vault", owner.key().as_ref()],
+        bump,
+        has_one = owner
+    )]
+    pub vault: Box<Account<'info, VaultAccount>>,
     #[account(mut)]
     pub owner: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -232,7 +250,7 @@ pub struct Withdraw<'info> {
         bump,
         has_one = owner
     )]
-    pub vault: Account<'info, VaultAccount>,
+    pub vault: Box<Account<'info, VaultAccount>>,
     #[account(mut)]
     pub owner: Signer<'info>,
     #[account(seeds = [b"algo_registry"], bump)]
@@ -247,14 +265,14 @@ pub struct RegisterPqcKey<'info> {
         bump,
         has_one = owner
     )]
-    pub vault: Account<'info, VaultAccount>,
+    pub vault: Box<Account<'info, VaultAccount>>,
     pub owner: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct Migrate<'info> {
     #[account(mut)]
-    pub vault: Account<'info, VaultAccount>,
+    pub vault: Box<Account<'info, VaultAccount>>,
     pub authority: Signer<'info>,
     #[account(seeds = [b"algo_registry"], bump)]
     pub algo_registry: Account<'info, AlgoRegistry>,
@@ -268,7 +286,7 @@ pub struct RotateAlgorithm<'info> {
         bump,
         has_one = owner
     )]
-    pub vault: Account<'info, VaultAccount>,
+    pub vault: Box<Account<'info, VaultAccount>>,
     pub owner: Signer<'info>,
     #[account(seeds = [b"algo_registry"], bump)]
     pub algo_registry: Account<'info, AlgoRegistry>,
