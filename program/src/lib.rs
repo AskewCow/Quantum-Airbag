@@ -7,7 +7,6 @@ declare_id!("J7gxnojav3SRfJxHhFGsW2iATBV4zVUsrkcKNzauPqRa");
 // ---------------------------------------------------------------------------
 
 const PQC_PUBKEY_LEN: usize = 1952; // ML-DSA-65 public key size in bytes
-const SENTINEL_AUTHORITY: &str = "SENTINEL_AUTHORITY_PLACEHOLDER";
 
 // ---------------------------------------------------------------------------
 // Program
@@ -19,9 +18,13 @@ pub mod quantum_airbag {
 
     /// Initialize the global algorithm registry PDA.
     /// Must be called once before any withdrawals can occur.
-    pub fn initialize_registry(ctx: Context<InitializeRegistry>) -> Result<()> {
+    pub fn initialize_registry(
+        ctx: Context<InitializeRegistry>,
+        sentinel_authority: Pubkey,
+    ) -> Result<()> {
         let registry = &mut ctx.accounts.algo_registry;
         registry.authority = ctx.accounts.authority.key();
+        registry.sentinel_authority = sentinel_authority;
         registry.active_mask = u64::MAX; // All algorithms active initially
         registry.bump = ctx.bumps.algo_registry;
         msg!(
@@ -37,6 +40,13 @@ pub mod quantum_airbag {
         require!(amount > 0, VaultError::InsufficientBalance);
 
         let vault = &mut ctx.accounts.vault;
+        if vault.owner == Pubkey::default() {
+            vault.owner = ctx.accounts.owner.key();
+            vault.bump = ctx.bumps.vault;
+            vault.algo_version = AlgoVersion::MlDsa65;
+            vault.mode = VaultMode::Normal;
+        }
+
         let ix = anchor_lang::solana_program::system_instruction::transfer(
             &ctx.accounts.owner.key(),
             &vault.key(),
@@ -109,6 +119,10 @@ pub mod quantum_airbag {
     /// This instruction has no withdrawal power. A compromised sentinel can
     /// cause a false lockdown (inconvenience) but cannot steal funds.
     pub fn migrate(ctx: Context<Migrate>) -> Result<()> {
+        require!(
+            ctx.accounts.authority.key() == ctx.accounts.algo_registry.sentinel_authority,
+            VaultError::UnauthorisedAuthority
+        );
         let vault = &mut ctx.accounts.vault;
         vault.mode = VaultMode::Lockdown;
         msg!(
@@ -241,12 +255,9 @@ pub struct RegisterPqcKey<'info> {
 pub struct Migrate<'info> {
     #[account(mut)]
     pub vault: Account<'info, VaultAccount>,
-    // Sentinel authority enforced here — any other signer is rejected by Anchor
-    #[account(
-        constraint = authority.key().to_string() == SENTINEL_AUTHORITY
-            @ VaultError::UnauthorisedAuthority
-    )]
     pub authority: Signer<'info>,
+    #[account(seeds = [b"algo_registry"], bump)]
+    pub algo_registry: Account<'info, AlgoRegistry>,
 }
 
 #[derive(Accounts)]
@@ -294,6 +305,7 @@ pub struct VaultAccount {
 #[derive(InitSpace)]
 pub struct AlgoRegistry {
     pub authority: Pubkey,
+    pub sentinel_authority: Pubkey,
     /// Bitmask: bit N = 1 means AlgoVersion N is Active, 0 = Banned
     pub active_mask: u64,
     pub bump: u8,

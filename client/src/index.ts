@@ -9,7 +9,7 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
-import { Connection, Keypair } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { ml_dsa65 } from "@noble/post-quantum/ml-dsa";
 import * as crypto from "crypto";
 import * as fs from "fs";
@@ -59,31 +59,56 @@ export function signPayload(payload: Uint8Array): { signature: Uint8Array; sigHa
   return { signature, sigHash };
 }
 
-function loadWalletKeypair(): Keypair {
+export function loadWalletKeypair(): Keypair {
   const raw = JSON.parse(fs.readFileSync(WALLET_KEYPAIR_PATH, "utf-8"));
   return Keypair.fromSecretKey(Uint8Array.from(raw));
 }
 
-export function register() {
+export function loadProgram(ownerKeypair: Keypair): anchor.Program {
+  const connection = new Connection(RPC_ENDPOINT, "confirmed");
+  const wallet = new anchor.Wallet(ownerKeypair);
+  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  const idlPath = path.resolve(__dirname, "../../program/target/idl/quantum_airbag.json");
+  const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
+  return new anchor.Program(idl, new PublicKey(PROGRAM_ID), provider);
+}
+
+export function getVaultPDA(owner: PublicKey, programId: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault"), owner.toBuffer()],
+    programId
+  );
+  return pda;
+}
+
+export function getAlgoRegistryPDA(programId: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("algo_registry")],
+    programId
+  );
+  return pda;
+}
+
+export async function register() {
   const raw = JSON.parse(fs.readFileSync(PQC_KEY_PATH, "utf-8"));
   const publicKey = Uint8Array.from(raw.publicKey);
   const ownerKeypair = loadWalletKeypair();
+  const program = loadProgram(ownerKeypair);
 
   console.log(`[client] Owner wallet: ${ownerKeypair.publicKey.toBase58()}`);
   console.log(`[client] ML-DSA-65 public key: ${publicKey.length} bytes`);
 
-  // TODO (Step 3): wire to deployed program
-  // const connection = new Connection(RPC_ENDPOINT, "confirmed");
-  // const provider = new anchor.AnchorProvider(connection, new anchor.Wallet(ownerKeypair), {});
-  // const idl = JSON.parse(fs.readFileSync("../program/target/idl/quantum_airbag.json", "utf-8"));
-  // const program = new anchor.Program(idl, new PublicKey(PROGRAM_ID), provider);
-  // const tx = await program.methods.registerPqcKey(Array.from(publicKey)).accounts({ ... }).rpc();
-  // console.log(`[client] Register tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`);
-  console.log(`[client] register stub — wire to deployed program in Step 3`);
+  const vaultPDA = getVaultPDA(ownerKeypair.publicKey, program.programId);
+  const tx = await (program.methods as any)
+    .registerPqcKey(Array.from(publicKey))
+    .accounts({ vault: vaultPDA, owner: ownerKeypair.publicKey })
+    .rpc();
+  console.log(`[client] Register tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`);
 }
 
-export function withdraw(amountLamports: number) {
+export async function withdraw(amountLamports: number) {
   const ownerKeypair = loadWalletKeypair();
+  const program = loadProgram(ownerKeypair);
 
   const payload = Buffer.concat([
     ownerKeypair.publicKey.toBuffer(),
@@ -97,13 +122,16 @@ export function withdraw(amountLamports: number) {
   console.log(`[client] ML-DSA-65 sig size: ${signature.length} bytes`);
   console.log(`[client] Hash commitment:    ${sigHash.toString("hex")}`);
 
-  // TODO (Step 3): wire to deployed program
-  // const tx = await program.methods.withdraw(new anchor.BN(amountLamports), Array.from(sigHash)).accounts({ ... }).rpc();
-  // console.log(`[client] Withdraw tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`);
-  console.log(`[client] withdraw stub — wire to deployed program in Step 3`);
+  const vaultPDA = getVaultPDA(ownerKeypair.publicKey, program.programId);
+  const algoRegistryPDA = getAlgoRegistryPDA(program.programId);
+  const tx = await (program.methods as any)
+    .withdraw(new anchor.BN(amountLamports), Array.from(sigHash))
+    .accounts({ vault: vaultPDA, owner: ownerKeypair.publicKey, algoRegistry: algoRegistryPDA })
+    .rpc();
+  console.log(`[client] Withdraw tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`);
 }
 
-export function rotate() {
+export async function rotate() {
   const seed = crypto.getRandomValues(new Uint8Array(32));
   const keypair = ml_dsa65.keygen(seed);
 
@@ -116,38 +144,55 @@ export function rotate() {
   console.log(`[client] New ML-DSA-65 keypair generated → ${rotatedPath}`);
   console.log(`[client] New public key: ${keypair.publicKey.length} bytes`);
 
-  // TODO (Step 6): wire rotate_algorithm instruction
-  // const tx = await program.methods.rotateAlgorithm(...).accounts({ ... }).rpc();
-  console.log(`[client] rotate stub — wire to deployed program in Step 6`);
+  const ownerKeypair = loadWalletKeypair();
+  const program = loadProgram(ownerKeypair);
+  const vaultPDA = getVaultPDA(ownerKeypair.publicKey, program.programId);
+  const algoRegistryPDA = getAlgoRegistryPDA(program.programId);
+
+  const newKeyTx = await (program.methods as any)
+    .registerPqcKey(Array.from(keypair.publicKey))
+    .accounts({ vault: vaultPDA, owner: ownerKeypair.publicKey })
+    .rpc();
+  console.log(`[client] Register new key tx: https://explorer.solana.com/tx/${newKeyTx}?cluster=devnet`);
+
+  const rotateTx = await (program.methods as any)
+    .rotateAlgorithm({ mlDsa65: {} })
+    .accounts({ vault: vaultPDA, owner: ownerKeypair.publicKey, algoRegistry: algoRegistryPDA })
+    .rpc();
+  console.log(`[client] Rotate algorithm tx: https://explorer.solana.com/tx/${rotateTx}?cluster=devnet`);
+
+  fs.copyFileSync(rotatedPath, PQC_KEY_PATH);
+  console.log(`[client] Active keypair updated to ${PQC_KEY_PATH}`);
 }
 
 // ---------------------------------------------------------------------------
 // CLI entry point
 // ---------------------------------------------------------------------------
 
-const [, , command, ...args] = process.argv;
-
-(async () => {
-  switch (command) {
-    case "generate-key":
-      generateKey();
-      break;
-    case "register":
-      register();
-      break;
-    case "withdraw": {
-      const lamports = parseInt(args[0] ?? "0");
-      if (!lamports) {
-        console.error("[client] Usage: withdraw <lamports>");
-        process.exit(1);
+if (require.main === module) {
+  const [, , command, ...args] = process.argv;
+  (async () => {
+    switch (command) {
+      case "generate-key":
+        generateKey();
+        break;
+      case "register":
+        await register();
+        break;
+      case "withdraw": {
+        const lamports = parseInt(args[0] ?? "0");
+        if (!lamports) {
+          console.error("[client] Usage: withdraw <lamports>");
+          process.exit(1);
+        }
+        await withdraw(lamports);
+        break;
       }
-      withdraw(lamports);
-      break;
+      case "rotate":
+        await rotate();
+        break;
+      default:
+        console.log("Usage: ts-node src/index.ts <generate-key|register|withdraw <lamports>|rotate>");
     }
-    case "rotate":
-      rotate();
-      break;
-    default:
-      console.log("Usage: ts-node src/index.ts <generate-key|register|withdraw <lamports>|rotate>");
-  }
-})();
+  })();
+}

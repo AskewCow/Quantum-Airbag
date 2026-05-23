@@ -1,7 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
-import { Connection, Keypair } from "@solana/web3.js";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import * as fs from "fs";
+import * as path from "path";
 import * as dotenv from "dotenv";
 
 dotenv.config();
@@ -86,18 +87,26 @@ async function poll(provider: anchor.AnchorProvider, keypair: Keypair) {
   }
 }
 
-async function triggerLockdown(provider: anchor.AnchorProvider, _keypair: Keypair) {
-  // TODO (Step 4): load the IDL and call vault.methods.migrate() here.
-  //
-  //   const idl = JSON.parse(fs.readFileSync("../program/target/idl/quantum_airbag.json", "utf-8"));
-  //   const program = new anchor.Program(idl, new PublicKey(PROGRAM_ID), provider);
-  //   const vaultPubkey = new PublicKey(VAULT_PUBKEY);
-  //   const tx = await program.methods.migrate()
-  //     .accounts({ vault: vaultPubkey, authority: _keypair.publicKey })
-  //     .rpc();
-  //   console.log(`[sentinel] 🔒 Lockdown tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`);
+async function triggerLockdown(provider: anchor.AnchorProvider, keypair: Keypair) {
+  const idlPath = path.resolve(__dirname, "../../program/target/idl/quantum_airbag.json");
+  const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
+  const program = new anchor.Program(idl, new PublicKey(PROGRAM_ID), provider);
 
-  console.log(`[sentinel] 🔒 migrate stub — wire to deployed program in Step 4`);
+  const vaultPubkey = new PublicKey(VAULT_PUBKEY);
+  const [algoRegistryPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from("algo_registry")],
+    program.programId
+  );
+
+  const tx = await (program.methods as any)
+    .migrate()
+    .accounts({
+      vault: vaultPubkey,
+      authority: keypair.publicKey,
+      algoRegistry: algoRegistryPDA,
+    })
+    .rpc();
+  console.log(`[sentinel] 🔒 Lockdown tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`);
 }
 
 main().catch((err) => {

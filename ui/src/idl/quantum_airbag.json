@@ -1,8 +1,138 @@
 {
   "version": "0.1.0",
   "name": "quantum_airbag",
-  "instructions": [],
-  "accounts": [],
+  "instructions": [
+    {
+      "name": "initializeRegistry",
+      "accounts": [
+        { "name": "algoRegistry", "isMut": true, "isSigner": false },
+        { "name": "authority", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "sentinelAuthority", "type": "publicKey" }
+      ]
+    },
+    {
+      "name": "deposit",
+      "accounts": [
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "owner", "isMut": true, "isSigner": true },
+        { "name": "systemProgram", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "accounts": [
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "owner", "isMut": true, "isSigner": true },
+        { "name": "algoRegistry", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "amount", "type": "u64" },
+        { "name": "pqcSigHash", "type": { "array": ["u8", 32] } }
+      ]
+    },
+    {
+      "name": "registerPqcKey",
+      "accounts": [
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "owner", "isMut": false, "isSigner": true }
+      ],
+      "args": [
+        { "name": "pqcPubkey", "type": "bytes" }
+      ]
+    },
+    {
+      "name": "migrate",
+      "accounts": [
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true },
+        { "name": "algoRegistry", "isMut": false, "isSigner": false }
+      ],
+      "args": []
+    },
+    {
+      "name": "rotateAlgorithm",
+      "accounts": [
+        { "name": "vault", "isMut": true, "isSigner": false },
+        { "name": "owner", "isMut": false, "isSigner": true },
+        { "name": "algoRegistry", "isMut": false, "isSigner": false }
+      ],
+      "args": [
+        { "name": "newVersion", "type": { "defined": "AlgoVersion" } }
+      ]
+    },
+    {
+      "name": "banAlgorithm",
+      "accounts": [
+        { "name": "algoRegistry", "isMut": true, "isSigner": false },
+        { "name": "authority", "isMut": false, "isSigner": true }
+      ],
+      "args": [
+        { "name": "version", "type": { "defined": "AlgoVersion" } }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "VaultAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "owner", "type": "publicKey" },
+          { "name": "pqcPubkey", "type": { "array": ["u8", 1952] } },
+          { "name": "algoVersion", "type": { "defined": "AlgoVersion" } },
+          { "name": "mode", "type": { "defined": "VaultMode" } },
+          { "name": "balance", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    },
+    {
+      "name": "AlgoRegistry",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "authority", "type": "publicKey" },
+          { "name": "sentinelAuthority", "type": "publicKey" },
+          { "name": "activeMask", "type": "u64" },
+          { "name": "bump", "type": "u8" }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "AlgoVersion",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "MlDsa65" }
+        ]
+      }
+    },
+    {
+      "name": "VaultMode",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          { "name": "Normal" },
+          { "name": "Lockdown" }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    { "code": 6000, "name": "AlgorithmBanned", "msg": "Algorithm is banned in the registry" },
+    { "code": 6001, "name": "InvalidPqcSignature", "msg": "PQC signature is invalid" },
+    { "code": 6002, "name": "UnauthorisedAuthority", "msg": "Caller is not the authorised sentinel" },
+    { "code": 6003, "name": "VaultInLockdown", "msg": "Vault is in Lockdown — Ed25519 withdrawals are blocked" },
+    { "code": 6004, "name": "InsufficientBalance", "msg": "Insufficient vault balance" }
+  ],
   "metadata": {
     "address": "J7gxnojav3SRfJxHhFGsW2iATBV4zVUsrkcKNzauPqRa"
   }

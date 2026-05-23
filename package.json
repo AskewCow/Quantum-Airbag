@@ -4,7 +4,11 @@
   "description": "Crypto-agile PDA vault for post-quantum security",
   "scripts": {
     "test": "anchor test --skip-local-validator",
-    "test:local": "anchor test"
+    "test:local": "anchor test",
+    "setup": "ts-node scripts/setup-local.ts",
+    "wallet": "ts-node scripts/generate-wallet.ts",
+    "sync-id": "ts-node scripts/sync-program-id.ts",
+    "demo": "npm --prefix client run demo"
   },
   "keywords": ["solana", "anchor", "post-quantum", "cryptography"],
   "author": "",
