@@ -1,0 +1,9 @@
+node_modules/
+dist/
+target/
+.anchor/
+*.json.local
+*-keypair.json
+sentinel-keypair.json
+.env
+.DS_Store

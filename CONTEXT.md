@@ -100,6 +100,7 @@ Adversaries record encrypted traffic/signed transactions today and decrypt/forge
 | SIMD-0416 Falcon syscall proposal | Search: "Solana SIMD-0416 Falcon" |
 | Anza PQ implementation | Search: "Anza Falcon post-quantum Solana" |
 | Firedancer PQ implementation | Search: "Firedancer Falcon post-quantum Solana" |
+| crypto-rs (Rust PQC primitives) | https://github.com/dark-bio/crypto-rs |
 
 ---
 
