@@ -9,6 +9,9 @@
     "test": "ts-mocha -p tsconfig.json tests/**/*.ts"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.98.4",
+    "dotenv": "^17.4.2",
     "express": "^4.18.2"
   },
   "devDependencies": {

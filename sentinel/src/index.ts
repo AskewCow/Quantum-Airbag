@@ -90,7 +90,7 @@ async function poll(provider: anchor.AnchorProvider, keypair: Keypair) {
 async function triggerLockdown(provider: anchor.AnchorProvider, keypair: Keypair) {
   const idlPath = path.resolve(__dirname, "../../program/target/idl/quantum_airbag.json");
   const idl = JSON.parse(fs.readFileSync(idlPath, "utf-8"));
-  const program = new anchor.Program(idl, new PublicKey(PROGRAM_ID), provider);
+  const program = new anchor.Program(idl, provider);
 
   const vaultPubkey = new PublicKey(VAULT_PUBKEY);
   const [algoRegistryPDA] = PublicKey.findProgramAddressSync(
