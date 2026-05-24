@@ -137,6 +137,12 @@ pub mod quantum_airbag {
         Ok(())
     }
 
+    /// Close the vault and return all lamports to the owner.
+    /// Only callable by the vault owner. Used for demo reset.
+    pub fn close_vault(_ctx: Context<CloseVault>) -> Result<()> {
+        Ok(())
+    }
+
     /// Update the algorithm version stored in the vault account.
     ///
     /// This is the user-facing crypto-agility mechanism. Changing algo_version
@@ -276,6 +282,20 @@ pub struct Migrate<'info> {
     pub authority: Signer<'info>,
     #[account(seeds = [b"algo_registry"], bump)]
     pub algo_registry: Account<'info, AlgoRegistry>,
+}
+
+#[derive(Accounts)]
+pub struct CloseVault<'info> {
+    #[account(
+        mut,
+        close = owner,
+        seeds = [b"vault", owner.key().as_ref()],
+        bump,
+        has_one = owner
+    )]
+    pub vault: Box<Account<'info, VaultAccount>>,
+    #[account(mut)]
+    pub owner: Signer<'info>,
 }
 
 #[derive(Accounts)]

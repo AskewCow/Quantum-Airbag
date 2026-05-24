@@ -12,7 +12,8 @@
     "threat-api": "npm --prefix threat-api start",
     "sentinel": "npm --prefix sentinel start",
     "ui": "npm --prefix ui run dev",
-    "dev": "npx concurrently -n threat-api,sentinel,ui -c cyan,yellow,green \"npm run threat-api\" \"npm run sentinel\" \"npm run ui\""
+    "reset": "TS_NODE_PROJECT=tsconfig.json ts-node scripts/reset-demo.ts",
+    "dev": "npm run reset && npx concurrently -n threat-api,sentinel,ui -c cyan,yellow,green \"npm run threat-api\" \"npm run sentinel\" \"npm run ui\""
   },
   "keywords": ["solana", "anchor", "post-quantum", "cryptography"],
   "author": "",
